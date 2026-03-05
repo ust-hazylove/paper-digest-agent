@@ -1,7 +1,7 @@
 {
-  "hours_back": 26,
-  "max_candidates": 120,
-  "top_n": 15,
+  "hours_back": 36,
+  "max_candidates": 300,
+  "top_n": 10,
   "keywords": [
     "large language model", "LLM", "VLM", "multimodal",
     "computer vision", "diffusion", "3D", "NeRF", "Gaussian splatting",
