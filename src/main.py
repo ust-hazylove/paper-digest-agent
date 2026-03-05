@@ -34,7 +34,7 @@ def main():
     keywords = cfg.get("keywords", [])
     feeds = cfg["arxiv"]["rss_feeds"]
 
-    openai_key = os.environ["OPENAI_API_KEY"]
+    # openai_key = os.environ["OPENAI_API_KEY"]
     smtp_host = os.environ["SMTP_HOST"]
     smtp_port = int(os.environ.get("SMTP_PORT", "587"))
     smtp_user = os.environ["SMTP_USER"]
@@ -64,7 +64,7 @@ def main():
             break
 
     # 3) LLM rank
-    ranked = rank_papers(candidates, keywords, openai_key)
+    ranked = rank_papers(candidates, keywords)
 
     # 4) choose top_n and mark seen
     chosen = [r for r in ranked if r.score >= 2.5][:top_n]
