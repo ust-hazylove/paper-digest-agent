@@ -1,0 +1,25 @@
+{
+  "hours_back": 26,
+  "max_candidates": 120,
+  "top_n": 15,
+  "keywords": [
+    "large language model", "LLM", "VLM", "multimodal",
+    "computer vision", "diffusion", "3D", "NeRF", "Gaussian splatting",
+    "robot", "robotics", "manipulation", "motion planning", "grasp",
+    "embodied", "embodied intelligence", "world model",
+    "physical AI", "sim2real", "reinforcement learning", "RLHF",
+    "manufacturing", "smart manufacturing", "industrial", "digital twin",
+    "assembly", "planning", "CAD", "CAM"
+  ],
+  "arxiv": {
+    "rss_feeds": [
+      "https://export.arxiv.org/rss/cs.AI",
+      "https://export.arxiv.org/rss/cs.CV",
+      "https://export.arxiv.org/rss/cs.LG",
+      "https://export.arxiv.org/rss/cs.RO",
+      "https://export.arxiv.org/rss/cs.CL",
+      "https://export.arxiv.org/rss/eess.IV",
+      "https://export.arxiv.org/rss/stat.ML"
+    ]
+  }
+}
