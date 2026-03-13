@@ -1,25 +1,28 @@
 {
-  "hours_back": 36,
-  "max_candidates": 300,
-  "top_n": 10,
-  "keywords": [
-    "large language model", "LLM", "VLM", "multimodal",
-    "computer vision", "diffusion", "3D", "NeRF", "Gaussian splatting",
-    "robot", "robotics", "manipulation", "motion planning", "grasp",
-    "embodied", "embodied intelligence", "world model",
-    "physical AI", "sim2real", "reinforcement learning", "RLHF",
-    "manufacturing", "smart manufacturing", "industrial", "digital twin",
-    "assembly", "planning", "CAD", "CAM"
+  "hours_back": 48,
+  "target_candidates": 1800,
+  "pre_rank_top_k": 150,
+  "top_n": 15,
+  "queries": [
+    "\"large language model\" OR LLM OR VLM OR multimodal",
+    "\"computer vision\" OR diffusion OR segmentation OR 3D OR NeRF OR \"Gaussian splatting\"",
+    "robot OR robotics OR manipulation OR grasp OR navigation OR embodied OR \"vision-language-action\" OR VLA",
+    "\"physical AI\" OR sim2real OR \"world model\" OR humanoid OR \"soft robot\"",
+    "manufacturing OR \"smart manufacturing\" OR industrial OR \"digital twin\" OR assembly OR CAD OR CAM"
   ],
   "arxiv": {
-    "rss_feeds": [
-      "https://export.arxiv.org/rss/cs.AI",
-      "https://export.arxiv.org/rss/cs.CV",
-      "https://export.arxiv.org/rss/cs.LG",
-      "https://export.arxiv.org/rss/cs.RO",
-      "https://export.arxiv.org/rss/cs.CL",
-      "https://export.arxiv.org/rss/eess.IV",
-      "https://export.arxiv.org/rss/stat.ML"
-    ]
+    "categories": ["cs.AI", "cs.CV", "cs.CL", "cs.LG", "cs.RO", "eess.IV", "stat.ML"],
+    "max_results_per_query": 200
+  },
+  "openalex": {
+    "enabled": true,
+    "per_page": 100,
+    "pages_per_query": 2
+  },
+  "ranking": {
+    "keyword_weight": 0.45,
+    "recency_weight": 0.20,
+    "source_weight": 0.10,
+    "llm_weight": 0.25
   }
 }
