@@ -4,11 +4,11 @@
   "pre_rank_top_k": 150,
   "top_n": 15,
   "queries": [
-    "\"large language model\" OR LLM OR VLM OR multimodal",
-    "\"computer vision\" OR diffusion OR segmentation OR 3D OR NeRF OR \"Gaussian splatting\"",
-    "robot OR robotics OR manipulation OR grasp OR navigation OR embodied OR \"vision-language-action\" OR VLA",
-    "\"physical AI\" OR sim2real OR \"world model\" OR humanoid OR \"soft robot\"",
-    "manufacturing OR \"smart manufacturing\" OR industrial OR \"digital twin\" OR assembly OR CAD OR CAM"
+    "large language model OR LLM OR VLM OR multimodal",
+    "computer vision OR diffusion OR segmentation OR 3D OR NeRF OR Gaussian splatting",
+    "robot OR robotics OR manipulation OR grasp OR navigation OR embodied OR vision-language-action OR VLA",
+    "physical AI OR sim2real OR world model OR humanoid OR soft robot",
+    "manufacturing OR smart manufacturing OR industrial OR digital twin OR assembly OR CAD OR CAM"
   ],
   "arxiv": {
     "categories": ["cs.AI", "cs.CV", "cs.CL", "cs.LG", "cs.RO", "eess.IV", "stat.ML"],
