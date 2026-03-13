@@ -1,14 +1,18 @@
 from __future__ import annotations
-import argparse, json, os
+import argparse
+import json
+import os
+import re
+import hashlib
 from datetime import datetime, timedelta, timezone
 from dateutil import parser as dtparser
 
-from .arxiv import fetch_from_feeds, Paper
-from .store import PaperStore
+from .models import Paper
+from .sources_arxiv_api import fetch_arxiv_api
+from .sources_openalex import fetch_openalex
 from .ranker import rank_papers
 from .template import render_digest
 from .emailer import send_email
-
 
 def within_hours(iso: str, hours: int) -> bool:
     try:
@@ -19,6 +23,39 @@ def within_hours(iso: str, hours: int) -> bool:
         return False
     return t >= datetime.now(timezone.utc) - timedelta(hours=hours)
 
+def norm_title(t: str) -> str:
+    t = t.lower().strip()
+    t = re.sub(r"\s+", " ", t)
+    t = re.sub(r"[^a-z0-9 ]+", "", t)
+    return t
+
+def dedup_papers(papers: list[Paper]) -> list[Paper]:
+    seen = set()
+    out = []
+    for p in papers:
+        key = None
+        if p.arxiv_id:
+            key = f"arxiv:{p.arxiv_id}"
+        elif p.doi:
+            key = f"doi:{p.doi.lower()}"
+        else:
+            key = "title:" + hashlib.sha256(norm_title(p.title).encode()).hexdigest()
+
+        if key in seen:
+            continue
+        seen.add(key)
+        out.append(p)
+    return out
+
+def pre_score(p: Paper, keywords: list[str]) -> float:
+    hay = f"{p.title} {p.summary}".lower()
+    kw_hits = sum(1 for k in keywords if k.lower() in hay)
+    recency = 1.0
+    if p.source == "arXiv":
+        source_bonus = 1.0
+    else:
+        source_bonus = 0.85
+    return kw_hits * 0.7 + recency * 0.2 + source_bonus * 0.1
 
 def main():
     ap = argparse.ArgumentParser()
@@ -27,81 +64,69 @@ def main():
 
     cfg = json.load(open(args.config, "r", encoding="utf-8"))
 
-    # --- Config ---
-    hours_back = int(cfg.get("hours_back", 26))
-    max_candidates = int(cfg.get("max_candidates", 250))  # 宽召回建议更大
+    hours_back = int(cfg.get("hours_back", 48))
+    target_candidates = int(cfg.get("target_candidates", 1800))
+    pre_rank_top_k = int(cfg.get("pre_rank_top_k", 150))
     top_n = int(cfg.get("top_n", 15))
-    keywords = cfg.get("keywords", [])
-    feeds = cfg["arxiv"]["rss_feeds"]
+    keywords = cfg.get("queries", [])
 
-    # --- Email env ---
-    smtp_host = os.environ["SMTP_HOST"]
-    smtp_port = int(os.environ.get("SMTP_PORT", "587"))
-    smtp_user = os.environ["SMTP_USER"]
-    smtp_pass = os.environ["SMTP_PASS"]
-    mail_to = os.environ["MAIL_TO"]
-    mail_from = os.environ["MAIL_FROM"]
+    arxiv_cfg = cfg["arxiv"]
+    openalex_cfg = cfg["openalex"]
 
-    store = PaperStore("data/papers.db")
+    collected: list[Paper] = []
 
-    # 1) Fetch from RSS feeds
-    all_papers = fetch_from_feeds(feeds)
+    # arXiv API
+    collected.extend(
+        fetch_arxiv_api(
+            categories=arxiv_cfg["categories"],
+            queries=cfg["queries"],
+            max_results_per_query=arxiv_cfg.get("max_results_per_query", 200)
+        )
+    )
 
-    # 2) Wide recall: time filter only (no keyword prefilter)
-    fresh = [p for p in all_papers if within_hours(p.published, hours_back)]
+    # OpenAlex
+    if openalex_cfg.get("enabled", True):
+        collected.extend(
+            fetch_openalex(
+                queries=cfg["queries"],
+                per_page=openalex_cfg.get("per_page", 100),
+                pages_per_query=openalex_cfg.get("pages_per_query", 2),
+                api_key=os.getenv("OPENALEX_API_KEY")
+            )
+        )
 
-    # If too few, expand time window (RSS timestamp can be unstable)
-    if len(fresh) < 30:
-        fresh = [p for p in all_papers if within_hours(p.published, max(48, hours_back))]
+    # time filter
+    fresh = [p for p in collected if within_hours(p.published, hours_back)]
 
-    # Newest first
-    fresh.sort(key=lambda p: p.published, reverse=True)
+    # dedup
+    fresh = dedup_papers(fresh)
 
-    # 3) Dedup and take up to max_candidates
-    candidates: list[Paper] = []
-    for p in fresh:
-        key = store.make_key(p)
-        if store.is_seen(key):
-            continue
-        candidates.append(p)
-        if len(candidates) >= max_candidates:
-            break
+    # pre-rank
+    scored = [(pre_score(p, cfg.get("keywords", [])), p) for p in fresh]
+    scored.sort(key=lambda x: x[0], reverse=True)
 
-    # 4) Rank by LLM (OpenRouter -> DeepSeek fallback inside ranker)
-    ranked = rank_papers(candidates, keywords)
+    # cap to target
+    candidates = [p for _, p in scored[:target_candidates]]
 
-    # 5) Non-empty sending strategy
-    #    Prefer high relevance, but never send empty.
-    HIGH_TH = 3.0
-    MID_TH = 2.0
+    # llm stage only on top 150
+    llm_pool = [p for _, p in scored[:pre_rank_top_k]]
+    ranked = rank_papers(llm_pool, cfg.get("keywords", []))
 
-    high = [r for r in ranked if r.score >= HIGH_TH]
-    mid = [r for r in ranked if MID_TH <= r.score < HIGH_TH]
+    chosen = ranked[:top_n]
 
-    chosen = (high[:top_n] if high else (mid[:top_n] if mid else ranked[:min(top_n, 10)]))
-
-    # Mark seen for chosen items so tomorrow won't repeat
-    now_iso = datetime.now(timezone.utc).isoformat()
-    for r in chosen:
-        key = store.make_key(r.paper)
-        store.mark_seen(key, now_iso)
-
-    store.close()
-
-    # 6) Send email
     body = render_digest(chosen)
     subject = f"Daily Paper Digest ({datetime.now().strftime('%Y-%m-%d')})"
+
     send_email(
-        smtp_host=smtp_host,
-        smtp_port=smtp_port,
-        smtp_user=smtp_user,
-        smtp_pass=smtp_pass,
-        mail_from=mail_from,
-        mail_to=mail_to,
+        smtp_host=os.environ["SMTP_HOST"],
+        smtp_port=int(os.environ.get("SMTP_PORT", "587")),
+        smtp_user=os.environ["SMTP_USER"],
+        smtp_pass=os.environ["SMTP_PASS"],
+        mail_from=os.environ["MAIL_FROM"],
+        mail_to=os.environ["MAIL_TO"],
         subject=subject,
         body=body,
     )
-
 
 if __name__ == "__main__":
     main()
